@@ -1,0 +1,130 @@
+---
+title: "Ibex Monitoring in Sierra Nevada National Park (Spain)"
+format: 
+  dashboard:
+    orientation: rows
+    theme: journal
+---
+
+```{r setup}
+#| include: false
+library(leaflet)
+library(sf)
+library(terra)
+library(RColorBrewer)
+library(dplyr)
+library(stringr)
+
+# 1. File Paths
+dem_path <- "data/elevation_sierra_nevada.tif"
+park_path <- "data/park_boundary.geojson"
+obs_path <- "data/sightings.geojson"
+
+# Read Raster
+r_dem <- rast(dem_path)
+
+# Read Vectors
+v_park <- st_read(park_path, quiet = TRUE)
+v_obs <- st_read(obs_path, quiet = TRUE)
+
+# 2. Light Preprocessing
+# Ensure EPSG:4326 (WGS84) projection for Leaflet
+if (st_crs(v_park)$epsg != 4326) {
+  v_park <- st_transform(v_park, 4326)
+}
+if (st_crs(v_obs)$epsg != 4326) {
+  v_obs <- st_transform(v_obs, 4326)
+}
+
+# Color Palette for Raster (Elevation)
+pal_dem <- colorNumeric(
+  palette = terrain.colors(10),
+  domain = values(r_dem),
+  na.color = "transparent"
+)
+
+# Color Palette for Points (Ibex Type)
+pal_obs <- colorFactor(
+  palette = c("navy", "darkred", "orange"),
+  domain = v_obs$type
+)
+```
+
+## Row {height=75%}
+```{r}
+#| title: "Habitat Analysis Map"
+#| padding: 0
+
+leaflet() |>
+  addProviderTiles(
+    providers$Esri.WorldTopoMap
+  ) |>
+  addRasterImage(
+    r_dem,
+    colors = pal_dem,
+    opacity = 0.6,
+    group = "Elevation"
+  ) |>
+  addLegend(
+    pal = pal_dem,
+    values = values(r_dem),
+    title = "Elevation (m)"
+  ) |>
+  addPolygons(
+    data = v_park,
+    color = "green",
+    weight = 2,
+    fill = FALSE,
+    group = "Park Boundary"
+  ) |>
+  addCircleMarkers(
+    data = v_obs,
+    radius = 6,
+    color = ~ pal_obs(type),
+    stroke = FALSE,
+    fillOpacity = 0.8,
+    popup = ~ str_glue("<strong>Type:</strong> {type}<br>ID: {id}"),
+    group = "Observations"
+  ) |>
+  addLayersControl(
+    baseGroups = c("Topo Map"),
+    overlayGroups = c("Elevation", "Park Boundary", "Observations"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+```
+
+## Row {height=25%}
+```{r}
+#| title: "Observations by Type"
+library(ggplot2)
+
+ggplot(
+  v_obs,
+  aes(x = type, fill = type)
+) +
+  geom_bar() +
+  scale_fill_manual(values = c("navy", "darkred", "orange")) +
+  theme_minimal() +
+  labs(x = NULL, y = "Count") +
+  theme(legend.position = "none")
+```
+
+```{r}
+#| title: "Max Elevation"
+#| content: valuebox
+#| icon: arrow-up-circle
+list(
+  color = "success",
+  value = str_glue("{round(minmax(r_dem)[2])} m")
+)
+```
+
+```{r}
+#| title: "Total Sightings"
+#| content: valuebox
+#| icon: binoculars
+list(
+  color = "primary",
+  value = nrow(v_obs)
+)
+```
