@@ -1,0 +1,14 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "Ibex Monitor"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Dashboard
+
+format:
+  dashboard:
+    theme: journal

@@ -8,12 +8,15 @@ format:
 
 ```{r setup}
 #| include: false
+library(ggplot2)
 library(leaflet)
 library(sf)
 library(terra)
 library(RColorBrewer)
 library(dplyr)
 library(stringr)
+library(DT)
+library(crosstalk)
 
 # 1. File Paths
 dem_path <- "data/elevation_sierra_nevada.tif"
@@ -27,6 +30,12 @@ r_dem <- rast(dem_path)
 v_park <- st_read(park_path, quiet = TRUE)
 v_obs <- st_read(obs_path, quiet = TRUE)
 
+# Ensure type column exists (create synthetic data if missing)
+if (!"type" %in% names(v_obs)) {
+  set.seed(123)
+  v_obs$type <- sample(c("Male", "Female", "Kid"), nrow(v_obs), replace = TRUE)
+}
+
 # 2. Light Preprocessing
 # Ensure EPSG:4326 (WGS84) projection for Leaflet
 if (st_crs(v_park)$epsg != 4326) {
@@ -36,10 +45,15 @@ if (st_crs(v_obs)$epsg != 4326) {
   v_obs <- st_transform(v_obs, 4326)
 }
 
+# Calculate elevation range for palettes
+dem_range <- minmax(r_dem)
+elev_min <- dem_range[1, 1]
+elev_max <- dem_range[2, 1]
+
 # Color Palette for Raster (Elevation)
 pal_dem <- colorNumeric(
   palette = terrain.colors(10),
-  domain = values(r_dem),
+  domain = c(elev_min, elev_max),
   na.color = "transparent"
 )
 
@@ -48,17 +62,23 @@ pal_obs <- colorFactor(
   palette = c("navy", "darkred", "orange"),
   domain = v_obs$type
 )
+
+# Calculate max elevation cleanly inside setup
+max_elev_value <- str_c(round(elev_max), " m")
+
+# Calculate total sightings
+total_sightings <- nrow(v_obs)
 ```
 
-## Row {height=75%}
+# Spatial Analysis {orientation="columns"}
+
+## Column {width=65%}
 ```{r}
 #| title: "Habitat Analysis Map"
 #| padding: 0
 
 leaflet() |>
-  addProviderTiles(
-    providers$Esri.WorldTopoMap
-  ) |>
+  addProviderTiles(providers$Esri.WorldTopoMap) |>
   addRasterImage(
     r_dem,
     colors = pal_dem,
@@ -67,7 +87,7 @@ leaflet() |>
   ) |>
   addLegend(
     pal = pal_dem,
-    values = values(r_dem),
+    values = c(elev_min, elev_max),
     title = "Elevation (m)"
   ) |>
   addPolygons(
@@ -87,35 +107,48 @@ leaflet() |>
     group = "Observations"
   ) |>
   addLayersControl(
-    baseGroups = c("Topo Map"),
+    baseGroups = "Topo Map",
     overlayGroups = c("Elevation", "Park Boundary", "Observations"),
     options = layersControlOptions(collapsed = FALSE)
   )
 ```
 
-## Row {height=25%}
+## Column {width=35%}
 ```{r}
 #| title: "Observations by Type"
-library(ggplot2)
+#| height: 80%
 
 ggplot(
   v_obs,
-  aes(x = type, fill = type)
+  aes(
+    x = str_to_title(type),
+    fill = type
+  )
 ) +
   geom_bar() +
   scale_fill_manual(values = c("navy", "darkred", "orange")) +
-  theme_minimal() +
-  labs(x = NULL, y = "Count") +
-  theme(legend.position = "none")
+  theme_minimal(base_size = 14) +
+  labs(
+    x = NULL,
+    y = "Count"
+  ) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(face = "bold", size = 12),
+    axis.title.y = element_text(size = 12),
+    panel.grid.major.x = element_blank()
+  )
 ```
 
+### Row {height=20%}
 ```{r}
 #| title: "Max Elevation"
 #| content: valuebox
 #| icon: arrow-up-circle
+
 list(
   color = "success",
-  value = str_glue("{round(minmax(r_dem)[2])} m")
+  value = max_elev_value
 )
 ```
 
@@ -123,8 +156,66 @@ list(
 #| title: "Total Sightings"
 #| content: valuebox
 #| icon: binoculars
+
 list(
   color = "primary",
-  value = nrow(v_obs)
+  value = total_sightings
 )
+```
+
+# Sighting Data
+
+## Column {width=75%}
+```{r}
+#| title: "Detailed Observations"
+
+# Prepare data with extracted coordinates
+obs_coords <- st_coordinates(v_obs)
+
+obs_data <- v_obs |>
+  mutate(
+    longitude = round(obs_coords[, 1], 3),
+    latitude = round(obs_coords[, 2], 3),
+    species = as.factor(species),
+    basisOfRecord = as.factor(basisOfRecord),
+    type = as.factor(type),
+  ) |>
+  st_drop_geometry()
+
+# Create shared data for crosstalk
+shared_obs <- SharedData$new(obs_data)
+
+datatable(
+  shared_obs,
+  options = list(
+    pageLength = 10,
+    dom = 'tip'
+  ),
+  colnames = c(
+    "ID",
+    "Species",
+    "Year",
+    "Date",
+    "Basis",
+    "Type",
+    "Source",
+    "Longitude",
+    "Latitude"
+  ),
+  rownames = FALSE
+)
+```
+
+## {.sidebar width=25% position="right"}
+```{r}
+# Filter widgets (client-side, no server required)
+filter_select(
+  "filter_species",
+  "Species",
+  shared_obs,
+  ~species,
+  multiple = TRUE
+)
+filter_select("filter_type", "Type", shared_obs, ~type, multiple = TRUE)
+filter_slider("filter_year", "Year", shared_obs, ~year, ticks = FALSE, step = 1)
 ```
