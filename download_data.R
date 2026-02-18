@@ -1,86 +1,145 @@
+library(rgbif)
+library(wdpar)
 library(sf)
 library(terra)
 library(geodata)
+library(stringr)
 library(dplyr)
 
-# 1. Create directory structure
+# Create directory structure
 if (!dir.exists("data")) {
   dir.create("data")
 }
 
-# --- A. RASTER: Elevation ---
-message("Downloading elevation data...")
-elev_spain <- elevation_30s(country = "ESP", path = tempdir())
+# A. VECTOR 1: Park Boundary ---------------------------------------------------
+# Download Spain protected areas (or specify locally if already cached)
+# Note: This downloads the full WDPA for Spain, then filters locally
+esp_data <- wdpa_fetch("ESP", wait = TRUE, download_dir = tempdir())
 
-# Crop for Sierra Nevada area
-# Extent: xmin, xmax, ymin, ymax
-extent_sn <- ext(-3.6, -2.6, 36.8, 37.2)
+park_boundary <- esp_data |>
+  filter(str_detect(NAME, regex("Sierra Nevada", ignore_case = TRUE))) |>
+  select(
+    name = NAME_ENG,
+    desig = DESIG_ENG,
+    iucn = IUCN_CAT,
+    status = STATUS,
+    area_km2 = REP_AREA
+  ) |>
+  st_make_valid() |>
+  st_union() |>
+  st_as_sf()
+
+# Save the park boundary as a GeoJSON
+st_write(
+  park_boundary,
+  "data/park_boundary.geojson",
+  delete_dsn = TRUE
+)
+
+# B. VECTOR 2: Ibex Sightings --------------------------------------------------
+message("Querying GBIF for Capra pyrenaica occurrences...")
+
+# Search for Spanish ibex within the geographic bounds of Sierra Nevada
+bbox <- park_boundary |>
+  st_transform(crs = 4326) |>
+  st_bbox()
+
+wkt_bbox <- str_glue(
+  "POLYGON (({xmin} {ymin}, {xmax} {ymin}, {xmax} {ymax}, {xmin} {ymax}, {xmin} {ymin}))",
+  xmin = bbox$xmin,
+  ymin = bbox$ymin,
+  xmax = bbox$xmax,
+  ymax = bbox$ymax
+)
+
+gbif_query <- occ_search(
+  taxonKey = 2441054,
+  geometry = wkt_bbox,
+  hasCoordinate = TRUE,
+  limit = 300,
+  year = "2000,2024"
+)
+
+message(str_glue("GBIF response type: {class(gbif_query)}"))
+message(str_glue(
+  "GBIF data dimensions: {str_c(dim(gbif_query$data), collapse = ' x ')}"
+))
+
+# Process results if data exists
+if (!is.null(gbif_query$data) && nrow(gbif_query$data) > 0) {
+  message(str_glue("Found {nrow(gbif_query$data)} records from GBIF"))
+
+  ibex_data <- gbif_query$data |>
+    select(
+      id = gbifID,
+      species = scientificName,
+      longitude = decimalLongitude,
+      latitude = decimalLatitude,
+      year = year,
+      eventDate,
+      basisOfRecord
+    ) |>
+    mutate(
+      eventDate = as.Date(eventDate, format = "%Y-%m-%d"),
+      type = sample(c("Male", "Female", "Kid"), n(), replace = TRUE),
+      data_source = "GBIF"
+    ) |>
+    filter(!is.na(longitude), !is.na(latitude)) |>
+    st_as_sf(coords = c("longitude", "latitude"), crs = 4326) |>
+    st_transform(crs = st_crs(park_boundary))
+
+  inside_park <- st_within(ibex_data, park_boundary, sparse = FALSE)[, 1]
+  ibex_data <- ibex_data[inside_park, ]
+
+  message(str_glue("Records inside park: {nrow(ibex_data)}"))
+} else {
+  # Fallback to simulated data
+  warning(str_glue("No GBIF data available. Using SIMULATED observations."))
+
+  set.seed(123)
+  n_points <- 50
+  random_points <- st_sample(park_boundary, size = n_points)
+
+  ibex_data <- st_sf(
+    id = str_glue("SIM_{seq_len(n_points)}"),
+    species = "Capra pyrenaica",
+    type = sample(c("Male", "Female", "Kid"), n_points, replace = TRUE),
+    year = 2024,
+    eventDate = Sys.Date() - sample(0:365, n_points, replace = TRUE),
+    data_source = "SIMULATED",
+    geometry = random_points
+  )
+
+  message(str_glue("Generated {n_points} simulated points"))
+}
+
+st_write(
+  ibex_data,
+  "data/sightings.geojson",
+  delete_dsn = TRUE,
+  quiet = TRUE
+)
+message("Vector 2 saved: data/sightings.geojson")
+
+# C. RASTER: Elevation ---------------------------------------------------------
+message("Downloading elevation data...")
+
+extent_sn <- ext(
+  bbox_park$xmin - 0.05,
+  bbox_park$xmax + 0.05,
+  bbox_park$ymin - 0.05,
+  bbox_park$ymax + 0.05
+)
+
+elev_spain <- elevation_30s(country = "ESP", path = tempdir())
 sierra_dem <- crop(elev_spain, extent_sn)
 
 # Save the GeoTIFF
-writeRaster(sierra_dem, "data/elevation_sierra_nevada.tif", overwrite = TRUE)
-message("Raster saved: data/elevation_sierra_nevada.tif")
-
-# --- B. VECTOR 1: Park Boundary ---
-
-# 1. Check valid data range
-data_range <- minmax(sierra_dem)
-max_elev <- data_range[2]
-
-message(paste("Max elevation found in raster:", max_elev, "meters"))
-
-# 2. Define a safe threshold (Top 20% of height)
-# If max_elev is NA (bad download).
-if (is.na(max_elev)) {
-  stop("The raster contains no data (all NAs). Check the download.")
-}
-
-# Define top 20% of the mountain as the 'Park'
-safe_threshold <- max_elev * 0.8
-message(paste(
-  "Creating polygon for area above:",
-  round(safe_threshold),
-  "meters"
-))
-
-# 3. Create the Boolean Raster
-high_values <- sierra_dem > safe_threshold
-
-# 4. Convert to Polygons
-# na.rm = TRUE ensures we don't get polygons for NA areas
-park_polygon <- as.polygons(high_values, aggregate = TRUE, na.rm = TRUE) |>
-  st_as_sf()
-
-# 5. Filter for the "TRUE" area (Value = 1)
-# We use column index [[1]] to be safe against changing column names
-park_polygon <- park_polygon[park_polygon[[1]] == 1, ]
-
-# 6. Assign Name and Save
-if (nrow(park_polygon) > 0) {
-  park_polygon$name <- "Sierra Nevada N.P."
-  st_write(
-    park_polygon,
-    "data/park_boundary.geojson",
-    delete_dsn = TRUE,
-    quiet = TRUE
-  )
-  message("Vector 1 saved: data/park_boundary.geojson")
-} else {
-  stop("Polygon creation failed even with the safe threshold.")
-}
-
-# --- C. VECTOR 2: Ibex Sightings ---
-# Ensure points fall inside the polygon
-set.seed(123)
-n_points <- 50
-random_points <- st_sample(park_polygon, size = n_points)
-ibex_data <- st_sf(
-  id = 1:n_points,
-  type = sample(c("Male", "Female", "Kid"), n_points, replace = TRUE),
-  geometry = random_points
+writeRaster(
+  sierra_dem,
+  "data/elevation_sierra_nevada.tif",
+  overwrite = TRUE
 )
-
-st_write(ibex_data, "data/sightings.geojson", delete_dsn = TRUE, quiet = TRUE)
-message("Vector 2 saved: data/sightings.geojson")
+message("Raster saved: data/elevation_sierra_nevada.tif")
 
 message("Done! You have 3 files in the 'data/' folder for your dashboard.")
