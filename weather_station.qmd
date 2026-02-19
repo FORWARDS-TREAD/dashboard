@@ -1,0 +1,267 @@
+---
+title: "Cardeña"
+format: 
+  dashboard:
+    orientation: rows
+    theme: journal
+---
+
+```{r setup}
+#| include: false
+library(ggplot2)
+library(leaflet)
+library(sf)
+library(jsonlite)
+library(dplyr)
+library(stringr)
+library(DT)
+library(lubridate)
+
+# 1. File Path
+json_path <- "data/data.json"
+
+# Read and parse JSON
+raw_json <- fromJSON(json_path, flatten = TRUE)
+
+# Extract station info
+station_name <- raw_json$data$nombre[[1]]
+station_id <- raw_json$data$id_elemento[[1]]
+
+# Extract sensors data
+sensors <- raw_json$data$sensores[[1]]
+
+# Flatten sensor data into a tidy data frame
+sensor_data <- list()
+
+for (i in seq_len(nrow(sensors))) {
+  sensor_id <- sensors$id_sensor_raw[i]
+  param_name <- sensors$parametro[i]
+  datos <- sensors$datos[[i]]
+
+  if (nrow(datos) > 0) {
+    temp_df <- datos |>
+      mutate(
+        sensor_id = sensor_id,
+        parameter = param_name
+      )
+    sensor_data[[i]] <- temp_df
+  }
+}
+
+# Combine all sensor data
+df_sensors <- bind_rows(sensor_data) |>
+  rename(
+    timestamp = fecha_raw,
+    value = valor_raw
+  ) |>
+  mutate(
+    timestamp = ymd_hms(timestamp),
+    value = as.numeric(value),
+    date = as.Date(timestamp),
+    # Format time as HH:MM string
+    time = format(timestamp, "%H:%M")
+  ) |>
+  select(sensor_id, parameter, date, time, value)
+
+# Station coordinates (approximate for PPI-1 Cardeña - Sierra Nevada area)
+station_lon <- -3.05
+station_lat <- 37.85
+
+# Create sf object for the station
+station_point <- st_sfc(
+  st_point(c(station_lon, station_lat)),
+  crs = 4326
+) |>
+  st_sf(
+    name = station_name,
+    id = station_id,
+    geometry = _
+  )
+
+# Calculate statistics
+total_readings <- nrow(df_sensors)
+unique_sensors <- n_distinct(df_sensors$parameter)
+```
+
+# Station Overview {orientation="columns"}
+
+## Column {width=65%}
+```{r}
+#| title: "Station Location Map"
+#| padding: 0
+
+leaflet() |>
+  addProviderTiles(providers$Esri.WorldTopoMap) |>
+  addCircleMarkers(
+    data = station_point,
+    radius = 12,
+    color = "red",
+    weight = 2,
+    fillOpacity = 0.8,
+    popup = ~ str_glue("<strong>Station:</strong> {name}<br>ID: {id}"),
+    label = ~name
+  ) |>
+  addLegend(
+    position = "bottomright",
+    colors = "red",
+    labels = "Weather Station",
+    title = "Monitoring Point"
+  )
+```
+
+## Column {width=35%}
+```{r}
+#| title: "Readings by Parameter"
+#| height: 80%
+
+# Aggregate readings by parameter
+param_counts <- df_sensors |>
+  count(parameter, name = "readings") |>
+  arrange(desc(readings))
+
+ggplot(
+  param_counts,
+  aes(
+    x = reorder(parameter, -readings),
+    y = readings,
+    fill = parameter
+  )
+) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_d() +
+  theme_minimal(base_size = 12) +
+  labs(
+    x = NULL,
+    y = "Number of Readings"
+  ) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    panel.grid.major.x = element_blank()
+  )
+```
+
+### Row {height=20%}
+```{r}
+#| title: "Total Readings"
+#| content: valuebox
+#| icon: chart-bar
+
+list(
+  color = "primary",
+  value = total_readings
+)
+```
+
+```{r}
+#| title: "Active Sensors"
+#| content: valuebox
+#| icon: gear
+
+list(
+  color = "success",
+  value = unique_sensors
+)
+```
+
+# Sensor Data
+
+## Column {width=75%}
+```{r}
+# Render DataTable with custom JavaScript parameter, date, and time search plugin
+datatable(
+  df_sensors,
+  elementId = "sensor_data_table",
+  options = list(
+    pageLength = 15,
+    dom = 'tip',
+    # Order by Date ascending, then Time ascending
+    order = list(list(2, "asc"), list(3, "asc")),
+    initComplete = JS(
+      "function(settings, json) {",
+      "  var tableApi = this.api();",
+
+      "  // Dynamically populate the Parameter dropdown from column data",
+      "  var paramSelect = $('#param_filter');",
+      "  tableApi.column(1).data().unique().sort().each(function(d, j) {",
+      "    paramSelect.append('<option value=\"' + d + '\">' + d + '</option>');",
+      "  });",
+
+      "  // Push custom search function",
+      "  $.fn.dataTable.ext.search.push(",
+      "    function(settings, data, dataIndex) {",
+      "      // Get filter inputs",
+      "      var paramInput = $('#param_filter').val();",
+      "      var minDateInput = $('#min_date').val();",
+      "      var maxDateInput = $('#max_date').val();",
+      "      var minTimeInput = $('#min_time').val();",
+      "      var maxTimeInput = $('#max_time').val();",
+
+      "      // Get row data (indices: 1=Parameter, 2=Date, 3=Time)",
+      "      var rowParam = data[1];",
+      "      var rowDate = data[2]; ",
+      "      var rowTime = data[3]; ",
+
+      "      // Parameter filtering logic",
+      "      var paramPass = true;",
+      "      if (paramInput && rowParam !== paramInput) { paramPass = false; }",
+
+      "      // Date filtering logic",
+      "      var datePass = true;",
+      "      if (minDateInput && rowDate < minDateInput) { datePass = false; }",
+      "      if (maxDateInput && rowDate > maxDateInput) { datePass = false; }",
+
+      "      // Time filtering logic",
+      "      var timePass = true;",
+      "      if (minTimeInput && rowTime < minTimeInput) { timePass = false; }",
+      "      if (maxTimeInput && rowTime > maxTimeInput) { timePass = false; }",
+
+      "      // All conditions must be met to display the row",
+      "      return paramPass && datePass && timePass;",
+      "    }",
+      "  );",
+
+      "  // Redraw table whenever any HTML input changes",
+      "  $('#param_filter, #min_date, #max_date, #min_time, #max_time').on('change', function() {",
+      "    tableApi.draw();",
+      "  });",
+      "}"
+    )
+  ),
+  colnames = c(
+    "Sensor ID",
+    "Parameter",
+    "Date",
+    "Time",
+    "Value"
+  ),
+  rownames = FALSE
+) |>
+  formatRound(columns = "value", digits = 3)
+```
+
+## {.sidebar width=25% position="right"}
+```{=html}
+<div style="padding: 10px;">
+  
+  <h5 style="margin-bottom: 15px;">Parameter</h5>
+  <select id="param_filter" class="form-control" style="margin-bottom: 25px; width: 100%;">
+    <option value="">All Parameters</option>
+    </select>
+
+  <h5 style="margin-bottom: 15px;">Date Range</h5>
+  <label for="min_date" style="font-weight: bold;">Start Date:</label>
+  <input type="date" id="min_date" class="form-control" style="margin-bottom: 15px; width: 100%;">
+  
+  <label for="max_date" style="font-weight: bold;">End Date:</label>
+  <input type="date" id="max_date" class="form-control" style="margin-bottom: 25px; width: 100%;">
+
+  <h5 style="margin-bottom: 15px;">Time Range (HH:MM)</h5>
+  <label for="min_time" style="font-weight: bold;">From Time:</label>
+  <input type="time" id="min_time" class="form-control" style="margin-bottom: 15px; width: 100%;">
+  
+  <label for="max_time" style="font-weight: bold;">To Time:</label>
+  <input type="time" id="max_time" class="form-control" style="margin-bottom: 15px; width: 100%;">
+
+</div>
+```
