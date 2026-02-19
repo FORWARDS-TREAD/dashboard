@@ -3,13 +3,6 @@ project:
   output-dir: _site
 
 website:
-<<<<<<< HEAD
-  title: "Ibex Monitor"
-  navbar:
-    left:
-      - href: index.qmd
-        text: Dashboard
-=======
   title: "Dashboard"
   navbar:
     left:
@@ -17,7 +10,6 @@ website:
         text: Cardeña
       - href: ibex.qmd
         text: Ibex
->>>>>>> b9d3069e6d9254078f3f5ec30658b974d8cdc082
 
 format:
   dashboard:

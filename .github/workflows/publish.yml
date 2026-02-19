@@ -37,7 +37,7 @@ jobs:
       - name: Install R Packages (BINARIES)
         run: |
           install.packages(
-            c("rmarkdown", "knitr", "leaflet", "sf", "terra", "geodata", "dplyr", "ggplot2", "RColorBrewer", "stringr", "DT", "rgbif", "wdpar"),
+            c("rmarkdown", "knitr", "leaflet", "sf", "terra", "geodata", "dplyr", "ggplot2", "RColorBrewer", "stringr", "DT", "rgbif", "wdpar", "lubridate"),
             repos = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"
           )
         shell: Rscript {0}
