@@ -6,10 +6,10 @@ website:
   title: "Dashboard"
   navbar:
     left:
+      - href: index.qmd
+        text: Home
       - href: weather_station.qmd
         text: Cardeña
-      # - href: ibex.qmd
-      #   text: Ibex
 
 format:
   dashboard:
