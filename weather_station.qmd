@@ -15,53 +15,67 @@ library(jsonlite)
 library(dplyr)
 library(stringr)
 library(DT)
-library(lubridate)
+library(crosstalk)
 
-# 1. File Path
-json_path <- "data/data.json"
+# Find all JSON files in data/PPI-1 and subdirectories
+json_files <- list.files(
+  path = "data/PPI-1",
+  pattern = "\\.json$",
+  recursive = TRUE,
+  full.names = TRUE
+)
 
-# Read and parse JSON
-raw_json <- fromJSON(json_path, flatten = TRUE)
+# Initialize list to store all sensor data
+all_sensor_data <- list()
+station_info <- NULL
 
-# Extract station info
-station_name <- raw_json$data$nombre[[1]]
-station_id <- raw_json$data$id_elemento[[1]]
+# Read and parse each JSON file
+for (json_path in json_files) {
+  raw_json <- fromJSON(json_path, flatten = TRUE)
 
-# Extract sensors data
-sensors <- raw_json$data$sensores[[1]]
+  # Extract station info (from first file)
+  if (is.null(station_info)) {
+    station_name <- raw_json$data$nombre[[1]]
+    station_id <- raw_json$data$id_elemento[[1]]
+    station_info <- list(name = station_name, id = station_id)
+  }
 
-# Flatten sensor data into a tidy data frame
-sensor_data <- list()
+  # Extract sensors data
+  sensors <- raw_json$data$sensores[[1]]
 
-for (i in seq_len(nrow(sensors))) {
-  sensor_id <- sensors$id_sensor_raw[i]
-  param_name <- sensors$parametro[i]
-  datos <- sensors$datos[[i]]
+  # Flatten sensor data for each sensor in this file
+  for (i in seq_len(nrow(sensors))) {
+    sensor_id <- sensors$id_sensor_raw[i]
+    param_name <- sensors$parametro[i]
+    datos <- sensors$datos[[i]]
+    source_file <- basename(json_path)
 
-  if (nrow(datos) > 0) {
-    temp_df <- datos |>
-      mutate(
-        sensor_id = sensor_id,
-        parameter = param_name
-      )
-    sensor_data[[i]] <- temp_df
+    if (nrow(datos) > 0) {
+      temp_df <- datos |>
+        mutate(
+          sensor_id = sensor_id,
+          parameter = param_name,
+          source_file = source_file
+        )
+      all_sensor_data[[length(all_sensor_data) + 1]] <- temp_df
+    }
   }
 }
 
 # Combine all sensor data
-df_sensors <- bind_rows(sensor_data) |>
-  rename(
-    timestamp = fecha_raw,
-    value = valor_raw
-  ) |>
+df_sensors <- bind_rows(all_sensor_data) |>
+  rename(value = valor_raw) |>
   mutate(
-    timestamp = ymd_hms(timestamp),
-    value = as.numeric(value),
-    date = as.Date(timestamp),
-    # Format time as HH:MM string
-    time = format(timestamp, "%H:%M")
+    datetime = as.POSIXct(fecha_raw, format = "%Y-%m-%d %H:%M", tz = ""),
+    date = as.Date(fecha_raw, format = "%Y-%m-%d"),
+    hour = format(datetime, "%H:%M"),
+    value = as.numeric(value)
   ) |>
-  select(sensor_id, parameter, date, time, value)
+  select(sensor_id, parameter, date, hour, value, datetime, source_file)
+
+# Extract station info for later use
+station_name <- station_info$name
+station_id <- station_info$id
 
 # Station coordinates (approximate for PPI-1 Cardeña - Sierra Nevada area)
 station_lon <- -3.05
@@ -77,6 +91,9 @@ station_point <- st_sfc(
     id = station_id,
     geometry = _
   )
+
+# Create shared data
+shared_data <- SharedData$new(df_sensors)
 
 # Calculate statistics
 total_readings <- nrow(df_sensors)
@@ -166,102 +183,64 @@ list(
 
 # Sensor Data
 
+## {.sidebar width=25% position="right"}
+```{r}
+# Filter widgets (client-side, no server required)
+filter_slider(
+  "filter_date",
+  "Date",
+  shared_data,
+  ~date,
+  width = "90%",
+  dragRange = TRUE
+)
+
+filter_select(
+  "filter_parameter",
+  "Parameter",
+  shared_data,
+  ~parameter,
+  multiple = TRUE
+)
+```
+
 ## Column {width=75%}
 ```{r}
-# Render DataTable with custom JavaScript parameter, date, and time search plugin
+#| title: "All Sensor Readings"
+
 datatable(
-  df_sensors,
-  elementId = "sensor_data_table",
+  shared_data,
+  extensions = "Buttons",
   options = list(
     pageLength = 15,
-    dom = 'tip',
-    # Order by Date ascending, then Time ascending
+    dom = 'Btip',
+    columnDefs = list(list(targets = c(-2, -1), visible = FALSE)),
     order = list(list(2, "asc"), list(3, "asc")),
-    initComplete = JS(
-      "function(settings, json) {",
-      "  var tableApi = this.api();",
-
-      "  // Dynamically populate the Parameter dropdown from column data",
-      "  var paramSelect = $('#param_filter');",
-      "  tableApi.column(1).data().unique().sort().each(function(d, j) {",
-      "    paramSelect.append('<option value=\"' + d + '\">' + d + '</option>');",
-      "  });",
-
-      "  // Push custom search function",
-      "  $.fn.dataTable.ext.search.push(",
-      "    function(settings, data, dataIndex) {",
-      "      // Get filter inputs",
-      "      var paramInput = $('#param_filter').val();",
-      "      var minDateInput = $('#min_date').val();",
-      "      var maxDateInput = $('#max_date').val();",
-      "      var minTimeInput = $('#min_time').val();",
-      "      var maxTimeInput = $('#max_time').val();",
-
-      "      // Get row data (indices: 1=Parameter, 2=Date, 3=Time)",
-      "      var rowParam = data[1];",
-      "      var rowDate = data[2]; ",
-      "      var rowTime = data[3]; ",
-
-      "      // Parameter filtering logic",
-      "      var paramPass = true;",
-      "      if (paramInput && rowParam !== paramInput) { paramPass = false; }",
-
-      "      // Date filtering logic",
-      "      var datePass = true;",
-      "      if (minDateInput && rowDate < minDateInput) { datePass = false; }",
-      "      if (maxDateInput && rowDate > maxDateInput) { datePass = false; }",
-
-      "      // Time filtering logic",
-      "      var timePass = true;",
-      "      if (minTimeInput && rowTime < minTimeInput) { timePass = false; }",
-      "      if (maxTimeInput && rowTime > maxTimeInput) { timePass = false; }",
-
-      "      // All conditions must be met to display the row",
-      "      return paramPass && datePass && timePass;",
-      "    }",
-      "  );",
-
-      "  // Redraw table whenever any HTML input changes",
-      "  $('#param_filter, #min_date, #max_date, #min_time, #max_time').on('change', function() {",
-      "    tableApi.draw();",
-      "  });",
-      "}"
+    buttons = list(
+      list(
+        extend = "csv",
+        filename = str_c("weather_station_", station_id),
+        title = NULL,
+        exportOptions = list(columns = ":visible")
+      ),
+      list(
+        extend = "excel",
+        filename = str_c("weather_station_", station_id),
+        title = NULL,
+        exportOptions = list(columns = ":visible")
+      )
     )
   ),
   colnames = c(
     "Sensor ID",
     "Parameter",
     "Date",
-    "Time",
-    "Value"
+    "Hour",
+    "Value",
+    "Timestamp",
+    "Source file"
   ),
   rownames = FALSE
 ) |>
   formatRound(columns = "value", digits = 3)
-```
-
-## {.sidebar width=25% position="right"}
-```{=html}
-<div style="padding: 10px;">
-  
-  <h5 style="margin-bottom: 15px;">Parameter</h5>
-  <select id="param_filter" class="form-control" style="margin-bottom: 25px; width: 100%;">
-    <option value="">All Parameters</option>
-    </select>
-
-  <h5 style="margin-bottom: 15px;">Date Range</h5>
-  <label for="min_date" style="font-weight: bold;">Start Date:</label>
-  <input type="date" id="min_date" class="form-control" style="margin-bottom: 15px; width: 100%;">
-  
-  <label for="max_date" style="font-weight: bold;">End Date:</label>
-  <input type="date" id="max_date" class="form-control" style="margin-bottom: 25px; width: 100%;">
-
-  <h5 style="margin-bottom: 15px;">Time Range (HH:MM)</h5>
-  <label for="min_time" style="font-weight: bold;">From Time:</label>
-  <input type="time" id="min_time" class="form-control" style="margin-bottom: 15px; width: 100%;">
-  
-  <label for="max_time" style="font-weight: bold;">To Time:</label>
-  <input type="time" id="max_time" class="form-control" style="margin-bottom: 15px; width: 100%;">
-
-</div>
 ```
