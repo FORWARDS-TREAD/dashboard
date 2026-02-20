@@ -37,15 +37,13 @@ jobs:
       - name: Install R Packages (BINARIES)
         run: |
           install.packages(
-            c("rmarkdown", "knitr", "leaflet", "sf", "terra", "geodata", "dplyr", "ggplot2", "RColorBrewer", "stringr", "DT", "rgbif", "wdpar", "lubridate"),
+            c("rmarkdown", "knitr", "leaflet", "sf", "terra", "geodata", "dplyr", "ggplot2", "RColorBrewer", "stringr", "DT", "rgbif", "wdpar", "lubridate", "crosstalk", "jsonlite"),
             repos = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"
           )
         shell: Rscript {0}
 
       - name: Render Quarto Project
         uses: quarto-dev/quarto-actions/render@v2
-        with:
-          to: dashboard
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
