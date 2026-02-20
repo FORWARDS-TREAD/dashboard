@@ -158,11 +158,11 @@ ggplot(
   )
 ```
 
-### Row {height=20%}
+### Row {height=30%}
 ```{r}
 #| title: "Total Readings"
 #| content: valuebox
-#| icon: chart-bar
+#| icon: bar-chart
 
 list(
   color = "primary",

@@ -8,8 +8,8 @@ website:
     left:
       - href: weather_station.qmd
         text: Cardeña
-      - href: ibex.qmd
-        text: Ibex
+      # - href: ibex.qmd
+      #   text: Ibex
 
 format:
   dashboard:
