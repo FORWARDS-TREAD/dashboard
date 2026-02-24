@@ -17,9 +17,9 @@ library(stringr)
 library(DT)
 library(crosstalk)
 
-# Find all JSON files in data/PPI-1 and subdirectories
+# Find all JSON files in data/stations and subdirectories
 json_files <- list.files(
-  path = "data/PPI-1",
+  path = "data/stations",
   pattern = "\\.json$",
   recursive = TRUE,
   full.names = TRUE

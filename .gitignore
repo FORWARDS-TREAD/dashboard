@@ -1,6 +1,8 @@
 /.quarto/
 /_site/
 /.continue/
+/data/stations/
+.env
 
 # History files
 .Rhistory
