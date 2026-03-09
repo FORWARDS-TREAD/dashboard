@@ -1,0 +1,292 @@
+---
+title: "Cardeña"
+format: 
+  dashboard:
+    orientation: rows
+    theme: journal
+    css: styles.css
+---
+
+```{r setup}
+#| include: false
+library(ggplot2)
+library(leaflet)
+library(sf)
+library(dplyr)
+library(arrow)
+library(stringr)
+
+station_parquet_name <- "PPI-1_Cardena"
+station_parquet_file <- str_glue(
+  "data/parquet/station_{station_parquet_name}.parquet"
+)
+station_name <- "Cardeña"
+station_id <- "PPI-1"
+
+# Read back for R plots and value boxes
+df <- read_parquet(str_glue("_site/{station_parquet_file}"))
+
+total_readings <- nrow(df)
+unique_sensors <- n_distinct(df$parameter)
+param_counts <- df |>
+  count(parameter, name = "readings") |>
+  arrange(desc(readings))
+
+# Station coordinates
+station_lon <- -3.05
+station_lat <- 37.85
+
+station_point <- st_sfc(
+  st_point(c(station_lon, station_lat)),
+  crs = 4326
+) |>
+  st_sf(name = station_name, id = station_id, geometry = _)
+```
+
+# Station Overview {orientation="columns"}
+
+## Column {width=65%}
+```{r}
+#| title: "Station Location Map"
+#| padding: 0
+
+leaflet() |>
+  addProviderTiles(providers$Esri.WorldTopoMap) |>
+  addCircleMarkers(
+    data = station_point,
+    radius = 12,
+    color = "red",
+    weight = 2,
+    fillOpacity = 0.8,
+    popup = ~ str_glue("<strong>Station:</strong> {name}<br>ID: {id}"),
+    label = ~name
+  ) |>
+  addLegend(
+    position = "bottomright",
+    colors = "red",
+    labels = "Weather Station",
+    title = "Monitoring Point"
+  )
+```
+
+## Column {width=35%}
+```{r}
+#| title: "Readings by Parameter"
+#| height: 80%
+
+ggplot(
+  param_counts,
+  aes(
+    x = reorder(parameter, -readings),
+    y = readings,
+    fill = parameter
+  )
+) +
+  geom_bar(stat = "identity") +
+  scale_fill_viridis_d() +
+  theme_minimal(base_size = 12) +
+  labs(
+    x = NULL,
+    y = "Number of Readings"
+  ) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    panel.grid.major.x = element_blank()
+  )
+```
+
+### Row {height=30%}
+```{r}
+#| title: "Total Readings"
+#| content: valuebox
+#| icon: bar-chart
+
+list(
+  color = "primary",
+  value = total_readings
+)
+```
+
+```{r}
+#| title: "Active Sensors"
+#| content: valuebox
+#| icon: gear
+
+list(
+  color = "success",
+  value = unique_sensors
+)
+```
+
+# Sensor Data
+
+## {.sidebar width=25% position="right"}
+```{ojs}
+//| echo: false
+//| output: false
+
+db = DuckDBClient.of({
+  readings: FileAttachment("data/parquet/station_PPI-1_Cardena.parquet")
+})
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+parameter_options = await db.query(
+  "SELECT DISTINCT parameter FROM readings ORDER BY parameter"
+).then(r => r.map(d => d.parameter))
+
+date_bounds = await db.query(
+  "SELECT MIN(date)::VARCHAR AS min_date, MAX(date)::VARCHAR AS max_date FROM readings"
+).then(r => r[0])
+```
+
+```{ojs}
+//| echo: false
+
+viewof selected_parameter = Inputs.checkbox(
+  parameter_options,
+  { 
+    label: "Parameters",
+    format: (x) => htl.html`<span class="parameter-item">${x}</span>`
+  }
+)
+
+htl.html`<div style="margin-top: 10px; margin-bottom: 25px;">
+  <button class="btn btn-outline-secondary btn-sm" onclick=${() => {
+    viewof selected_parameter.value = [];
+    viewof selected_parameter.dispatchEvent(new CustomEvent("input"));
+  }}>Reset Parameters</button>
+</div>`
+
+viewof date_from = Inputs.date(
+  { label: "From", value: new Date(date_bounds.min_date) }
+)
+
+viewof date_to = Inputs.date(
+  { label: "To", value: new Date(date_bounds.max_date) }
+)
+```
+
+## Column {width=75%}
+
+```{ojs}
+//| echo: false
+//| output: false
+
+param_clause = selected_parameter.length === 0
+  ? ""
+  : `AND parameter IN (${selected_parameter.map(p => `'${p}'`).join(",")})`
+
+from_date = date_from.toISOString().slice(0, 10)
+to_date   = date_to.toISOString().slice(0, 10)
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+mutable current_page = 0
+reset_page = { from_date; to_date; selected_parameter; mutable current_page = 0; }
+
+page_size = 20
+
+count_result = await db.query(`
+  SELECT COUNT(*) AS n
+  FROM readings
+  WHERE date BETWEEN '${from_date}' AND '${to_date}'
+  ${param_clause}
+`)
+total_rows = Number(count_result[0].n)
+total_pages = Math.ceil(total_rows / page_size)
+
+page_rows = await db.query(`
+  SELECT sensor_id, parameter, date::VARCHAR AS date, hour, ROUND(value, 3) AS value
+  FROM readings
+  WHERE date BETWEEN '${from_date}' AND '${to_date}'
+  ${param_clause}
+  ORDER BY date, hour
+  LIMIT ${page_size} OFFSET ${current_page * page_size}
+`)
+page_rows_array = Array.from(page_rows)
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+downloadCSV = async () => {
+  const csv_rows = await db.query(`
+    SELECT sensor_id, parameter, date::VARCHAR AS date, hour, ROUND(value, 3) AS value
+    FROM readings
+    WHERE date BETWEEN '${from_date}' AND '${to_date}'
+    ${param_clause}
+    ORDER BY date, hour
+  `)
+  const header = "sensor_id,parameter,date,hour,value"
+  const body = Array.from(csv_rows)
+    .map(r => [r.sensor_id, r.parameter, r.date, r.hour, r.value].join(","))
+    .join("\n")
+  const blob = new Blob([header + "\n" + body], { type: "text/csv" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "station_data.csv"
+  a.click()
+  URL.revokeObjectURL(url)
+}
+```
+
+```{ojs}
+//| echo: false
+//| title: "Sensor Readings"
+
+htl.html`<div class="data-table-container">
+  <div class="data-table-toolbar">
+    <button class="btn-small" onclick=${downloadCSV}>⬇ CSV</button>
+    <div class="data-table-pagination">
+      <button class="btn-small"
+        onclick=${() => { if (current_page > 0) mutable current_page -= 1 }}
+        ?disabled=${current_page === 0}
+      >← Prev</button>
+      <span>Page ${current_page + 1} of ${total_pages} (${total_rows} rows)</span>
+      <button class="btn-small"
+        onclick=${() => { if (current_page < total_pages - 1) mutable current_page += 1 }}
+        ?disabled=${current_page === total_pages - 1}
+      >Next →</button>
+    </div>
+  </div>
+  <div class="data-table-wrapper">
+    <table class="data-table">
+      <colgroup>
+        <col style="width:15%">
+        <col style="width:35%">
+        <col style="width:20%">
+        <col style="width:15%">
+        <col style="width:15%">
+      </colgroup>
+      <thead>
+        <tr>
+          ${["Sensor ID", "Parameter", "Date", "Hour", "Value"].map(h =>
+            htl.html`<th>${h}</th>`
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        ${page_rows_array.map((r, i) =>
+          htl.html`<tr>
+            <td>${r.sensor_id}</td>
+            <td>${r.parameter}</td>
+            <td>${r.date}</td>
+            <td>${r.hour}</td>
+            <td>${r.value}</td>
+          </tr>`
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>`
+```

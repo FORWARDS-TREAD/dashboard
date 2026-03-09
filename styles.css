@@ -1,0 +1,78 @@
+input[type="date"] {
+  height: auto !important; 
+}
+
+.data-table-container {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+}
+
+.data-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid #dee2e6;
+  background: white;
+}
+
+.data-table-pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.data-table-wrapper {
+  overflow-y: auto;
+  height: calc(100vh - 160px);
+}
+
+.data-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.data-table thead {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 2px solid #dee2e6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid #dee2e6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table tbody tr:nth-child(even) {
+  background: #f8f9fa;
+}
+
+.btn-small {
+  padding: 0.1rem 0.5rem;
+}
+
+.parameter-item {
+  display: block;
+  min-width: 200px;
+}
+
+.observablehq--inputs-checkbox > div label {
+  display: block !important;
+  margin-bottom: 5px;
+}

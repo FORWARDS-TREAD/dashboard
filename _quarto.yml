@@ -1,5 +1,6 @@
 project:
   type: website
+  pre-render: _common.R
   output-dir: _site
 
 website:
@@ -8,7 +9,7 @@ website:
     left:
       - href: index.qmd
         text: Home
-      - href: weather_station.qmd
+      - href: cardena.qmd
         text: Cardeña
 
 format:

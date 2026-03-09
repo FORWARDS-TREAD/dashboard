@@ -2,4 +2,4 @@
 title: "Dashboard"
 ---
 
-- [Cardeña](weather_station.qmd)
+- [Cardeña](cardena.qmd)
