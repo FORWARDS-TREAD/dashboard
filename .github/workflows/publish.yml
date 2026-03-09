@@ -1,6 +1,9 @@
 name: Render and Deploy Dashboard
 
 on:
+  push:
+    branches:
+      - main
   repository_dispatch:
     types: ['data-updated-event']
   workflow_dispatch:
