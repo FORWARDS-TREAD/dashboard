@@ -1,5 +1,35 @@
 ---
-title: "Dashboard"
+pagetitle: "TREAD: Tracking Resilience and Early Assessment of Disturbances"
+format:
+  html:
+    theme: journal
+    css: styles.css
 ---
 
-- [Cardeña](cardena.qmd)
+# TREAD: Tracking Resilience and Early Assessment of Disturbances
+### An automated early-warning system for forest vulnerability using functional traits and thermal remote sensing
+
+# Project Overview
+
+Welcome to the TREAD research dashboard. This project focuses on analyzing ecosystem dynamics and environmental parameters across six diverse study zones in the Iberian Peninsula and Portugal.
+
+## Research Objectives
+
+The TREAD project employs high-resolution aerial imagery and ground-based sensor networks to monitor:
+
+*   **Vegetation Health**: Hyperspectral and multispectral analysis of forest and agricultural areas.
+*   **Thermal Dynamics**: Monitoring surface temperature patterns through thermal imagery.
+*   **Microclimate conditions**: Continuous data collection from specialized weather stations.
+
+## Study Zones
+
+Our research spans several key locations:
+
+1.  **Córdoba**: Focus on Mediterranean oak forests and agricultural transitions.
+2.  **Cardeña**: Integrated monitoring with both flight imagery and continuous sensor data.
+3.  **Segovia**: Analysis of high-altitude pine forests and ecosystem resilience.
+4.  **Madrid**: Monitoring urban-forest interface and fire risk factors.
+5.  **Ponte de Sôr**: Cork oak (Montado) ecosystem dynamics in Portugal.
+6.  **Nazaré**: Coastal pine forest monitoring and maritime climate influence.
+
+Explore the available data using the navigation menu above to access flight imagery and sensor readings for each zone.

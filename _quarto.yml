@@ -2,16 +2,36 @@ project:
   type: website
   pre-render: _common.R
   output-dir: _site
+  render:
+    - "*.qmd"
 
 website:
-  title: "Dashboard"
+  title: "TREAD"
   navbar:
+    background: primary
     left:
-      - href: index.qmd
-        text: Home
-      - href: cardena.qmd
-        text: Cardeña
+      - text: Flights
+        menu:
+          - href: cordoba-flights.qmd
+            text: "Raso del Conejo"
+          - href: cardena-flights.qmd
+            text: "Vegueta"
+          - href: segovia-flights.qmd
+            text: "Valsaín"
+          - href: madrid-flights.qmd
+            text: "Valdemaqueda"
+          - href: pontedesor-flights.qmd
+            text: "Herdade de João Galego"
+          - href: nazare-flights.qmd
+            text: "Mata do Valado de Frades"
+      - text: Sensors
+        menu:
+          - href: cardena-sensors.qmd
+            text: "Cardeña"
+      - href: team.qmd
+        text: Research Team
 
 format:
   dashboard:
     theme: journal
+    css: styles.css

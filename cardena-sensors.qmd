@@ -1,0 +1,233 @@
+---
+pagetitle: "Cardeña"
+format:
+  dashboard:
+    orientation: rows
+    theme: journal
+    css: styles.css
+---
+
+```{r setup}
+#| include: false
+station_slug <- "cardena-sensors"
+library(arrow)
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+library(stringr)
+
+source("station_registry.R")
+
+station <- get_station_registry_entry(station_slug)
+parquet_pattern <- "_site/data/parquet/station_Cardena_*.parquet"
+```
+
+```{ojs}
+//| echo: false
+//| output: false
+
+db = DuckDBClient.of({})
+await db.query(`
+  CREATE VIEW IF NOT EXISTS readings AS 
+  SELECT * FROM read_parquet('${parquet_pattern}')
+`)
+
+parameter_options = await db.query(
+  "SELECT DISTINCT parameter FROM readings ORDER BY parameter"
+).then(r => r.map(d => d.parameter))
+
+date_bounds = await db.query(
+  "SELECT MIN(date)::VARCHAR AS min_date, MAX(date)::VARCHAR AS max_date FROM readings"
+).then(r => r[0])
+
+mutable plot_parameter = null
+mutable show_modal = false
+
+from_date = date_from.toISOString().slice(0, 10)
+to_date = date_to.toISOString().slice(0, 10)
+
+param_clause = selected_parameter.length === 0
+  ? ""
+  : `AND parameter IN (${selected_parameter.map(p => `'${p}'`).join(",")})`
+
+mutable current_page = 0
+reset_page = { from_date; to_date; selected_parameter; mutable current_page = 0; }
+
+page_size = 20
+
+count_result = await db.query(`
+  SELECT COUNT(*) AS n
+  FROM readings
+  WHERE date BETWEEN '${from_date}' AND '${to_date}'
+  ${param_clause}
+`)
+total_rows = Number(count_result[0].n)
+total_pages = Math.ceil(total_rows / page_size)
+
+page_rows = await db.query(`
+  SELECT sensor_id, parameter, date::VARCHAR AS date, hour, ROUND(value, 3) AS value
+  FROM readings
+  WHERE date BETWEEN '${from_date}' AND '${to_date}'
+  ${param_clause}
+  ORDER BY date, hour
+  LIMIT ${page_size} OFFSET ${current_page * page_size}
+`)
+page_rows_array = Array.from(page_rows)
+
+downloadCSV = async () => {
+  const csv_rows = await db.query(`
+    SELECT sensor_id, parameter, date::VARCHAR AS date, hour, ROUND(value, 3) AS value
+    FROM readings
+    WHERE date BETWEEN '${from_date}' AND '${to_date}'
+    ${param_clause}
+    ORDER BY date, hour
+  `)
+  const header = "sensor_id,parameter,date,hour,value"
+  const body = Array.from(csv_rows)
+    .map(r => [r.sensor_id, r.parameter, r.date, r.hour, r.value].join(","))
+    .join("\n")
+  const blob = new Blob([header + "\n" + body], { type: "text/csv" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "station-data.csv"
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+plot_data = plot_parameter 
+  ? await db.query(`
+      SELECT (date || ' ' || hour || ':00')::TIMESTAMP AS datetime, value
+      FROM readings
+      WHERE parameter = '${plot_parameter}'
+      AND date BETWEEN '${from_date}' AND '${to_date}'
+      ORDER BY datetime
+    `)
+  : []
+
+render_plot = () => Plot.plot({
+  width: width * 0.85,
+  height: 500,
+  grid: true,
+  title: plot_parameter ? "Parameter: " + plot_parameter : "Select a parameter to plot (click 📈 icon in sidebar)",
+  x: { label: "Date & Time" },
+  y: { label: plot_parameter || "Value" },
+  marks: [
+    Plot.lineY(plot_data, {x: "datetime", y: "value", stroke: "steelblue", marker: "circle"}),
+    Plot.tip(plot_data, Plot.pointerX({x: "datetime", y: "value"}))
+  ]
+})
+```
+
+# Sensor Data
+
+## {.sidebar width=25% position="right"}
+
+```{ojs}
+//| echo: false
+
+viewof selected_parameter = Inputs.checkbox(
+  parameter_options,
+  {
+    label: "Parameters",
+    format: (x) => htl.html`<div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+      <span class="parameter-item">${x}</span>
+      <button class="btn btn-outline-primary btn-sm" style="margin-left: 5px; padding: 0px 5px;" onclick=${(e) => { 
+        e.stopPropagation(); 
+        e.preventDefault();
+        mutable plot_parameter = x;
+        mutable show_modal = true;
+        const label = e.target.closest('label');
+        if (label) {
+          const cb = label.querySelector('input[type="checkbox"]');
+          if (cb && !cb.checked) {
+            cb.checked = true;
+            cb.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+      }}>📈</button>
+    </div>`
+  }
+)
+
+htl.html`<div style="margin-top: 10px; margin-bottom: 25px;">
+  <button class="btn btn-outline-secondary btn-sm" onclick=${() => {
+    viewof selected_parameter.value = [];
+    viewof selected_parameter.dispatchEvent(new CustomEvent("input"));
+  }}>Reset Parameters</button>
+</div>`
+
+viewof date_from = Inputs.date(
+  { label: "From", value: new Date(date_bounds.min_date) }
+)
+
+viewof date_to = Inputs.date(
+  { label: "To", value: new Date(date_bounds.max_date) }
+)
+```
+
+## Column {width=100%}
+
+### Row {height=100%}
+
+```{ojs}
+//| echo: false
+//| title: "Sensor Readings"
+
+table_view = htl.html`<div class="data-table-container">
+  <div class="data-table-toolbar">
+    <button class="btn-small" onclick=${downloadCSV}>CSV</button>
+    <div class="data-table-pagination">
+      <button class="btn-small"
+        onclick=${() => { if (current_page > 0) mutable current_page -= 1 }}
+        ?disabled=${current_page === 0}
+      >Prev</button>
+      <span>Page ${current_page + 1} of ${total_pages} (${total_rows} rows)</span>
+      <button class="btn-small"
+        onclick=${() => { if (current_page < total_pages - 1) mutable current_page += 1 }}
+        ?disabled=${current_page === total_pages - 1}
+      >Next</button>
+    </div>
+  </div>
+  <div class="data-table-wrapper">
+    <table class="data-table">
+      <colgroup>
+        <col style="width:15%">
+        <col style="width:35%">
+        <col style="width:20%">
+        <col style="width:15%">
+        <col style="width:15%">
+      </colgroup>
+      <thead>
+        <tr>
+          ${["Sensor ID", "Parameter", "Date", "Hour", "Value"].map(h =>
+            htl.html`<th>${h}</th>`
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        ${page_rows_array.map(r =>
+          htl.html`<tr>
+            <td>${r.sensor_id}</td>
+            <td>${r.parameter}</td>
+            <td>${r.date}</td>
+            <td>${r.hour}</td>
+            <td>${r.value}</td>
+          </tr>`
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>`
+
+modal_view = htl.html`<div class="chart-modal-overlay" style="display: ${show_modal ? 'flex' : 'none'}">
+  <div class="chart-modal-content">
+    <span class="chart-modal-close" onclick=${() => mutable show_modal = false}>&times;</span>
+    <div class="chart-modal-body">
+      ${plot_parameter ? render_plot() : 'No parameter selected'}
+    </div>
+  </div>
+</div>`
+
+htl.html`${table_view}${modal_view}`
+```

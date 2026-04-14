@@ -1,0 +1,30 @@
+---
+pagetitle: "Research Team - TREAD"
+format:
+  html:
+    theme: journal
+    css: styles.css
+---
+
+# TREAD Project Team
+
+The TREAD project is an international collaboration focused on tropical and Mediterranean ecosystem monitoring.
+
+## Principal Investigators
+
+*   **Dr. [Name]** - Lead Researcher (Institution)
+*   **Dr. [Name]** - Remote Sensing Specialist (Institution)
+
+## Field Operations
+
+*   **[Name]** - Aerial Survey Coordination
+*   **[Name]** - Sensor Network Maintenance
+
+## Data Science and Analytics
+
+*   **[Name]** - Dashboard Development and Data Integration
+*   **[Name]** - Statistical Analysis and Modeling
+
+## Partner Institutions
+
+The project involves researchers from multiple European institutions specialized in environmental science, remote sensing, and ecosystem dynamics.
