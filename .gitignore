@@ -1,6 +1,7 @@
 /.quarto/
 /_site/
 /.continue/
+/.gemini/
 /data/stations/
 /_station_registry.rds
 /_generated_station_pages.txt
