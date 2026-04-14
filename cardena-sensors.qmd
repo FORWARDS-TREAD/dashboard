@@ -19,18 +19,16 @@ library(stringr)
 source("station_registry.R")
 
 station <- get_station_registry_entry(station_slug)
-parquet_pattern <- "_site/data/parquet/station_Cardena_*.parquet"
+df <- read_parquet("_site/data/parquet/station_Cardena.parquet")
 ```
 
 ```{ojs}
 //| echo: false
 //| output: false
 
-db = DuckDBClient.of({})
-await db.query(`
-  CREATE VIEW IF NOT EXISTS readings AS 
-  SELECT * FROM read_parquet('${parquet_pattern}')
-`)
+db = DuckDBClient.of({
+  readings: FileAttachment("_site/data/parquet/station_Cardena.parquet")
+})
 
 parameter_options = await db.query(
   "SELECT DISTINCT parameter FROM readings ORDER BY parameter"

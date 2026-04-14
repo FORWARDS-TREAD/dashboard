@@ -13,12 +13,6 @@ station_registry_path <- "_station_registry.rds"
 station_page_manifest_path <- "_generated_station_pages.txt"
 stations_config_path <- "data/stations_config.csv"
 
-known_station_coordinates <- tibble(
-  station_slug = "cardena",
-  station_lon = -4.218,
-  station_lat = 38.242
-)
-
 slugify_value <- function(value) {
   value |>
     stri_trans_general("Latin-ASCII") |>
@@ -76,8 +70,6 @@ discover_stations <- function(
               page_file = str_glue("{id}-flights.qmd"),
               parquet_name = NA_character_,
               parquet_relative_path = NA_character_,
-              station_lon = NA_real_,
-              station_lat = NA_real_,
               has_sensor_data = FALSE,
               has_geotiff = TRUE,
               json_files = list(character()),
@@ -96,9 +88,6 @@ discover_stations <- function(
           sort()
 
         if (length(json_files) > 0) {
-          coordinates <- known_station_coordinates |>
-            filter(station_slug == !!id)
-
           parquet_name <- format_station_parquet_name(sensor_display_name)
           parquet_relative_path <- str_glue(
             "data/parquet/station_{parquet_name}.parquet"
@@ -119,16 +108,6 @@ discover_stations <- function(
               page_file = str_glue("{id}-sensors.qmd"),
               parquet_name = parquet_name,
               parquet_relative_path = parquet_relative_path,
-              station_lon = if (nrow(coordinates) == 1) {
-                coordinates$station_lon
-              } else {
-                NA_real_
-              },
-              station_lat = if (nrow(coordinates) == 1) {
-                coordinates$station_lat
-              } else {
-                NA_real_
-              },
               has_sensor_data = TRUE,
               has_geotiff = FALSE,
               json_files = list(json_files),
@@ -236,18 +215,16 @@ sensor_station_page_lines <- function(station) {
     "source(\"station_registry.R\")",
     "",
     "station <- get_station_registry_entry(station_slug)",
-    str_glue('parquet_pattern <- "_site/data/parquet/station_{station$parquet_name[[1]]}_*.parquet"'),
+    str_glue('df <- read_parquet("{parquet_path}")'),
     "```",
     "",
     "```{ojs}",
     "//| echo: false",
     "//| output: false",
     "",
-    "db = DuckDBClient.of({})",
-    "await db.query(`",
-    "  CREATE VIEW IF NOT EXISTS readings AS ",
-    "  SELECT * FROM read_parquet('${parquet_pattern}')",
-    "`)",
+    str_glue(
+      'db = DuckDBClient.of({{\n  readings: FileAttachment("{parquet_path}")\n}})'
+    ),
     "",
     "parameter_options = await db.query(",
     "  \"SELECT DISTINCT parameter FROM readings ORDER BY parameter\"",
