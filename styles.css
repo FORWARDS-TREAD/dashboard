@@ -116,6 +116,16 @@ input[type="date"] {
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
+  overflow: auto;
 }
 
+.bslib-grid-item:has(.chart-modal-overlay),
+.bslib-card:has(.chart-modal-overlay),
+.html-fill-item:has(.chart-modal-overlay) {
+  z-index: 10000 !important;
+}
+
+body:has(.chart-modal-overlay[style*="display: flex"]) .quarto-dashboard-header,
+body:has(.chart-modal-overlay[style*="display: flex"]) .navbar {
+  z-index: 1 !important;
+}

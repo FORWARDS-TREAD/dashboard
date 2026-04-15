@@ -105,7 +105,7 @@ plot_data = plot_parameter
 
 render_plot = () => Plot.plot({
   width: width * 0.85,
-  height: 500,
+  height: 400,
   grid: true,
   title: plot_parameter ? "Parameter: " + plot_parameter : "Select a parameter to plot (click 📈 icon in sidebar)",
   x: { label: "Date & Time" },

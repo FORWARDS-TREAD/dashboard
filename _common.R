@@ -20,5 +20,10 @@ walk(seq_len(nrow(sensor_stations)), function(index) {
     "{parquet_dir}/station_{station$parquet_name[[1]]}.parquet"
   )
 
+  # Optimize Parquet file for DuckDB by sorting physically
+  # Sorting by date and parameter makes min/max row group stats highly effective
+  optimized_station_data <- station_data |>
+    arrange(date, parameter)
+
   write_parquet(station_data, parquet_output_path)
 })

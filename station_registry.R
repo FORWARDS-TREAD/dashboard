@@ -35,7 +35,12 @@ discover_stations <- function(
   config <- read_csv(config_path, show_col_types = FALSE)
 
   stations <- config |>
-    pmap_dfr(function(id, flight_display_name, flight_dates, sensor_display_name) {
+    pmap_dfr(function(
+      id,
+      flight_display_name,
+      flight_dates,
+      sensor_display_name
+    ) {
       flight_dir <- file.path(stations_path, "flights_data", id)
       sensor_dir <- file.path(stations_path, "sensors_data", id)
 
@@ -63,8 +68,12 @@ discover_stations <- function(
               station_slug = str_c(id, "-flights"),
               station_id = id,
               station_name = flight_display_name,
-              station_label = str_glue("{flight_display_name} ({flight_dates})"),
-              station_title = str_glue("{flight_display_name} ({flight_dates})"),
+              station_label = str_glue(
+                "{flight_display_name} ({flight_dates})"
+              ),
+              station_title = str_glue(
+                "{flight_display_name} ({flight_dates})"
+              ),
               navigation_label = flight_display_name,
               page_slug = str_c(id, "-flights"),
               page_file = str_glue("{id}-flights.qmd"),
@@ -301,7 +310,7 @@ sensor_station_page_lines <- function(station) {
     "",
     "render_plot = () => Plot.plot({",
     "  width: width * 0.85,",
-    "  height: 500,",
+    "  height: 400,",
     "  grid: true,",
     "  title: plot_parameter ? \"Parameter: \" + plot_parameter : \"Select a parameter to plot (click 📈 icon in sidebar)\",",
     "  x: { label: \"Date & Time\" },",
@@ -688,4 +697,3 @@ build_imagery_station_map <- function(station) {
 build_station_map <- function(station) {
   build_imagery_station_map(station)
 }
-
