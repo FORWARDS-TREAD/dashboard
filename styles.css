@@ -129,3 +129,8 @@ body:has(.chart-modal-overlay[style*="display: flex"]) .quarto-dashboard-header,
 body:has(.chart-modal-overlay[style*="display: flex"]) .navbar {
   z-index: 1 !important;
 }
+
+.navbar-brand img {
+  max-height: 40px;
+  width: auto;
+}

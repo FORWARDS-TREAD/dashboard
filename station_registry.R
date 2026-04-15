@@ -9,6 +9,8 @@ library(stringi)
 library(terra)
 library(tibble)
 
+MAX_RASTER_PIXELS <- 5000000
+
 station_registry_path <- "_station_registry.rds"
 station_page_manifest_path <- "_generated_station_pages.txt"
 stations_config_path <- "data/stations_config.csv"
@@ -565,12 +567,11 @@ build_raster_bounds <- function(raster) {
 build_raster_overlay <- function(raster_path, station) {
   r <- terra::rast(raster_path)
 
-  # Downsample if too large for web display (aiming for ~1M pixels)
-  max_pixels <- 1000000
+  # Downsample if too large for web display
   current_pixels <- terra::ncell(r)
 
-  if (current_pixels > max_pixels) {
-    fact <- ceiling(sqrt(current_pixels / max_pixels))
+  if (current_pixels > MAX_RASTER_PIXELS) {
+    fact <- ceiling(sqrt(current_pixels / MAX_RASTER_PIXELS))
     if (fact > 1) {
       r <- suppressWarnings(suppressMessages(
         terra::aggregate(r, fact = fact, fun = "mean", na.rm = TRUE)

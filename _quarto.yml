@@ -6,8 +6,8 @@ project:
     - "*.qmd"
 
 website:
-  title: "TREAD"
   navbar:
+    logo: TREAD_logo.svg
     background: primary
     left:
       - text: Flights
