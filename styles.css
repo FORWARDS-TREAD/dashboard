@@ -119,9 +119,9 @@ input[type="date"] {
   overflow: auto;
 }
 
-.bslib-grid-item:has(.chart-modal-overlay),
-.bslib-card:has(.chart-modal-overlay),
-.html-fill-item:has(.chart-modal-overlay) {
+.bslib-grid-item:has(.chart-modal-overlay[style*="display: flex"]),
+.bslib-card:has(.chart-modal-overlay[style*="display: flex"]),
+.html-fill-item:has(.chart-modal-overlay[style*="display: flex"]) {
   z-index: 10000 !important;
 }
 
