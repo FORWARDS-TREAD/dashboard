@@ -2,7 +2,7 @@
 pagetitle: "TREAD: Tracking Resilience and Early Assessment of Disturbances"
 format:
   html:
-    theme: journal
+    theme: minty
     css: styles.css
 ---
 

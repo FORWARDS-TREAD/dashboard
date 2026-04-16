@@ -3,7 +3,7 @@ pagetitle: "Herdade de João Galego (2025-09-15)"
 format:
   dashboard:
     orientation: rows
-    theme: journal
+    theme: minty
     css: styles.css
 ---
 

@@ -2,7 +2,7 @@
 pagetitle: "Research Team - TREAD"
 format:
   html:
-    theme: journal
+    theme: minty
     css: styles.css
 ---
 

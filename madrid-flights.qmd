@@ -3,7 +3,7 @@ pagetitle: "Valdemaqueda (2025-07-16)"
 format:
   dashboard:
     orientation: rows
-    theme: journal
+    theme: minty
     css: styles.css
 ---
 

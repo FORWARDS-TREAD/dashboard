@@ -1,5 +1,5 @@
 ---
-pagetitle: "Raso del Conejo (2025-07-09)"
+pagetitle: "Vegueta (2025-07-09)"
 format:
   dashboard:
     orientation: rows
@@ -9,7 +9,7 @@ format:
 
 ```{r setup}
 #| include: false
-station_slug <- "cordoba-flights"
+station_slug <- "cardena-flights"
 library(leaflet)
 
 source("station_registry.R")
@@ -33,4 +33,5 @@ The table below shows the tree species distribution (number of specimens) for th
 
 | Location | Q. ilex | Q. suber | P. Pinea | P. Pinaster | P. silvestris |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| Raso | 327 | 75 | 35 | 0 | 0 |
+| Vegueta | 0 | 0 | 27 | 352 | 0 |
+
