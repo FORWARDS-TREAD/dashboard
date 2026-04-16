@@ -33,5 +33,5 @@ website:
 
 format:
   dashboard:
-    theme: journal
+    theme: minty
     css: styles.css
