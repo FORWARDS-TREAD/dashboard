@@ -691,7 +691,7 @@ build_imagery_station_map <- function(station) {
     ) |>
     addLayersControl(
       overlayGroups = rev(overlay_labels),
-      options = layersControlOptions(collapsed = FALSE)
+      options = layersControlOptions(collapsed = FALSE, autoZIndex = FALSE)
     )
 }
 
