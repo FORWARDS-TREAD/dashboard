@@ -5,7 +5,6 @@ format:
     orientation: rows
     theme: minty
     css: styles.css
-page-layout: full
 ---
 
 ```{r setup}
@@ -18,11 +17,11 @@ source("station_registry.R")
 station <- get_station_registry_entry(station_slug)
 ```
 
-# Map
+# Map {orientation="columns"}
 
-## Row {height=100%}
-
+## Column
 ```{r}
+#| title: "GeoTIFF Map"
 #| padding: 0
 
 build_station_map(station)

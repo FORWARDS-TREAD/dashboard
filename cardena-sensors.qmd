@@ -5,7 +5,6 @@ format:
     orientation: rows
     theme: minty
     css: styles.css
-page-layout: full
 ---
 
 ```{r setup}
