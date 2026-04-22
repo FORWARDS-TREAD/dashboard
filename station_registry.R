@@ -592,7 +592,7 @@ build_raster_overlay <- function(raster_path, station) {
 }
 
 add_raster_overlay_to_map <- function(map, overlay) {
-  max_bytes <- 1024 * 1024 * 256
+  max_bytes <- 1024 * 1024 * 512
   r <- overlay$raster
   n_lyr <- terra::nlyr(r)
 
