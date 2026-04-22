@@ -135,13 +135,18 @@ body:has(.chart-modal-overlay[style*="display: flex"]) .navbar {
   width: auto;
 }
 
-/* Force full width for dashboard content */
-.quarto-dashboard-content, 
-.quarto-dashboard-content > .bslib-grid,
-.quarto-dashboard-content .container-fluid {
-  max-width: none !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
+/* Target the dashboard content only if it contains the map row */
+.quarto-dashboard-content:has(.map-row) {
+  padding: 0 !important;
+}
+
+/* Remove grid gaps and card borders for the map */
+.map-row {
+  gap: 0 !important;
+  grid-template-columns: 1fr !important;
+}
+
+.map-row .bslib-card {
+  border: none !important;
+  border-radius: 0 !important;
 }

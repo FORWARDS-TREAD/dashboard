@@ -479,7 +479,7 @@ imagery_station_page_lines <- function(station) {
     "",
     "# Map",
     "",
-    "## Row {height=100%}",
+    "## Row {height=100% .map-row}",
     "",
     "```{r}",
     "#| padding: 0",
@@ -592,7 +592,7 @@ build_raster_overlay <- function(raster_path, station) {
 }
 
 add_raster_overlay_to_map <- function(map, overlay) {
-  max_bytes <- 1024 * 1024 * 512
+  max_bytes <- 1024 * 1024 * 256
   r <- overlay$raster
   n_lyr <- terra::nlyr(r)
 
@@ -659,7 +659,8 @@ build_imagery_station_map <- function(station) {
 
   map_widget <- leaflet(
     options = leafletOptions(preferCanvas = TRUE),
-    width = "100%", height = "100%"
+    width = "100%",
+    height = "100%"
   ) |>
     addProviderTiles(providers$Esri.WorldImagery)
 

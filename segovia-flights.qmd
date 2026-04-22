@@ -19,7 +19,7 @@ station <- get_station_registry_entry(station_slug)
 
 # Map
 
-## Row {height=100%}
+## Row {height=100% .map-row}
 
 ```{r}
 #| padding: 0
