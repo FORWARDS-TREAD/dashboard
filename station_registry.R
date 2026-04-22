@@ -600,7 +600,13 @@ add_raster_overlay_to_map <- function(map, overlay) {
   # for "already colorized" imagery. Setting the RGB flag allows leaflet
   # to use the internal colorization instead of applying a palette.
   if (n_lyr >= 3 && n_lyr <= 4) {
-    terra::RGB(r) <- 1:n_lyr
+    if (n_lyr == 4) {
+      # Convert alpha=0 pixels to NA so they are rendered transparently
+      # before we drop the 4th band.
+      r[r[[4]] == 0] <- NA
+      r <- r[[1:3]]
+    }
+    terra::RGB(r) <- 1:3
 
     map |>
       addRasterImage(
