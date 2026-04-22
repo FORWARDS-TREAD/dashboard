@@ -212,6 +212,7 @@ sensor_station_page_lines <- function(station) {
     "    orientation: rows",
     "    theme: minty",
     "    css: styles.css",
+    "page-layout: full",
     "---",
     "",
     "```{r setup}",
@@ -465,6 +466,7 @@ imagery_station_page_lines <- function(station) {
     "    orientation: rows",
     "    theme: minty",
     "    css: styles.css",
+    "page-layout: full",
     "---",
     "",
     "```{r setup}",
@@ -477,11 +479,11 @@ imagery_station_page_lines <- function(station) {
     "station <- get_station_registry_entry(station_slug)",
     "```",
     "",
-    "# Map {orientation=\"columns\"}",
+    "# Map",
     "",
-    "## Column",
+    "## Row {height=100%}",
+    "",
     "```{r}",
-    "#| title: \"GeoTIFF Map\"",
     "#| padding: 0",
     "",
     "build_station_map(station)",
@@ -658,7 +660,8 @@ build_imagery_station_map <- function(station) {
   raster_paths <- station$geotiff_files[[1]]
 
   map_widget <- leaflet(
-    options = leafletOptions(preferCanvas = TRUE)
+    options = leafletOptions(preferCanvas = TRUE),
+    width = "100%", height = "100%"
   ) |>
     addProviderTiles(providers$Esri.WorldImagery)
 
