@@ -17,11 +17,11 @@ source("station_registry.R")
 station <- get_station_registry_entry(station_slug)
 ```
 
-# Map {orientation="columns"}
+# Map
 
-## Column
+## Row {height=100%}
+
 ```{r}
-#| title: "GeoTIFF Map"
 #| padding: 0
 
 build_station_map(station)

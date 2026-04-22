@@ -134,3 +134,14 @@ body:has(.chart-modal-overlay[style*="display: flex"]) .navbar {
   max-height: 40px;
   width: auto;
 }
+
+/* Force full width for dashboard content */
+.quarto-dashboard-content, 
+.quarto-dashboard-content > .bslib-grid,
+.quarto-dashboard-content .container-fluid {
+  max-width: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
