@@ -2,7 +2,7 @@
 /_site/
 /.continue/
 /.gemini/
-/data/stations/
+/data/
 /_station_registry.rds
 /_generated_station_pages.txt
 .env

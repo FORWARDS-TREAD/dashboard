@@ -41,7 +41,9 @@ discover_stations <- function(
       id,
       flight_display_name,
       flight_dates,
-      sensor_display_name
+      sensor_display_name,
+      api_url,
+      ...
     ) {
       flight_dir <- file.path(stations_path, "flights_data", id)
       sensor_dir <- file.path(stations_path, "sensors_data", id)
@@ -81,6 +83,7 @@ discover_stations <- function(
               page_file = str_glue("{id}-flights.qmd"),
               parquet_name = NA_character_,
               parquet_relative_path = NA_character_,
+              api_url = api_url,
               has_sensor_data = FALSE,
               has_geotiff = TRUE,
               json_files = list(character()),
@@ -119,6 +122,7 @@ discover_stations <- function(
               page_file = str_glue("{id}-sensors.qmd"),
               parquet_name = parquet_name,
               parquet_relative_path = parquet_relative_path,
+              api_url = api_url,
               has_sensor_data = TRUE,
               has_geotiff = FALSE,
               json_files = list(json_files),
@@ -162,17 +166,28 @@ read_station_sensor_data <- function(station) {
 
   for (json_path in json_files) {
     raw_json <- fromJSON(json_path, flatten = TRUE)
-    sensors <- raw_json$data$sensores[[1]]
 
-    for (index in seq_len(nrow(sensors))) {
-      sensor_data <- sensors$datos[[index]]
+    if (!isTRUE(raw_json$success) || !is.data.frame(raw_json$data) || nrow(raw_json$data) == 0) {
+      next
+    }
 
-      if (nrow(sensor_data) > 0) {
-        all_sensor_data[[length(all_sensor_data) + 1]] <- sensor_data |>
-          mutate(
-            sensor_id = sensors$id_sensor_raw[index],
-            parameter = sensors$parametro[index]
-          )
+    for (i in seq_len(nrow(raw_json$data))) {
+      sensors <- raw_json$data$sensores[[i]]
+
+      if (is.null(sensors) || !is.data.frame(sensors) || nrow(sensors) == 0) {
+        next
+      }
+
+      for (index in seq_len(nrow(sensors))) {
+        sensor_data <- sensors$datos[[index]]
+
+        if (is.data.frame(sensor_data) && nrow(sensor_data) > 0) {
+          all_sensor_data[[length(all_sensor_data) + 1]] <- sensor_data |>
+            mutate(
+              sensor_id = sensors$id_sensor_raw[index],
+              parameter = sensors$parametro[index]
+            )
+        }
       }
     }
   }
